@@ -3,17 +3,18 @@ const dbConfig = require('../config/dbconfig');
 
 class UserService {
     static async updatePassword(BusinessID, oldPassword, newPassword) {
+        let pool;
         try {
-       
-            await sql.connect(dbConfig);
-            console.log('Successfully connected to database');
-            // Verify old password
-            const verifyResult = await sql.query`
-                SELECT UserPassword 
-                FROM dbo.DCUser
-                WHERE BusinessID = ${BusinessID}
-            `;
-            console.log('Available tables:', tables.recordset);
+            pool = await sql.connect(dbConfig);
+
+            // Simple query without database prefix
+            const verifyResult = await pool.request()
+                .input('BusinessID', sql.Int, BusinessID)
+                .query(`
+                    SELECT UserPassword 
+                    FROM DCUser
+                    WHERE BusinessID = @BusinessID
+                `);
 
             if (verifyResult.recordset.length === 0) {
                 throw new Error('User not found');
@@ -23,46 +24,28 @@ class UserService {
                 throw new Error('Incorrect old password');
             }
 
-            // Update password
-            const result = await sql.query`
-                UPDATE dbo.DCUser 
-                SET UserPassword = ${newPassword}
-                WHERE BusinessID = ${BusinessID}
-            `;
+            const updateResult = await pool.request()
+                .input('BusinessID', sql.Int, BusinessID)
+                .input('newPassword', sql.NVarChar(50), newPassword)
+                .query(`
+                    UPDATE DCUser
+                    SET UserPassword = @newPassword
+                    WHERE BusinessID = @BusinessID
+                `);
 
-            if (result.rowsAffected[0] === 0) {
+            if (updateResult.rowsAffected[0] === 0) {
                 throw new Error('Failed to update password');
             }
 
             return { success: true };
 
         } catch (error) {
+            console.error('Database Error:', error);
             throw error;
         } finally {
-            await sql.close();
-        }
-    }
-
-    static async updatePasswordDirect(BusinessID, newPassword) {
-        try {
-            await sql.connect(dbConfig);
-
-            const result = await sql.query`
-                UPDATE dbo.DCUser 
-                SET UserPassword = ${newPassword}
-                WHERE BusinessID = ${BusinessID}
-            `;
-
-            if (result.rowsAffected[0] === 0) {
-                throw new Error('User not found');
+            if (pool) {
+                await pool.close();
             }
-
-            return { success: true };
-
-        } catch (error) {
-            throw error;
-        } finally {
-            await sql.close();
         }
     }
 }

@@ -1,11 +1,11 @@
 const express = require('express');
 const router = express.Router();
 const UserController = require('../controllers/usercontroller');
+const validateRequest = require('../middleware/validateRequest');
 
-// Route to update password with old password verification
-router.put('/updatePassword', UserController.updatePassword);
-
-// Route to update password directly
-router.put('/updatePasswordDirect', UserController.updatePasswordDirect);
+router.post('/updatePassword', 
+    validateRequest.validatePasswordUpdate,
+    UserController.updatePassword
+);
 
 module.exports = router;
